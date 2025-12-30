@@ -80,7 +80,7 @@ def update_weather():
                 </style>
             </head>
             <body>
-                <h2>Weather Observation for Lebanon, PA</h2>
+                <h2>Weather Observation for City, State</h2>
                 <p><b>Observation Ran At:</b> {current_time}</p>
                 <p><b>Overview:</b> {w.detailed_status}</p>
                 <p><b>Temperature:</b> {temperature_value}°F</p>
