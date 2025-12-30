@@ -1,0 +1,130 @@
+from flask import Flask, render_template_string
+from pyowm import OWM
+from datetime import datetime
+import threading
+import time
+
+# -------------------------
+# Flask app setup
+# -------------------------
+
+app = Flask(__name__)
+
+# Shared dictionary to store latest weather data
+latest_weather = {"output": "Loading..."}
+
+# -------------------------
+# Wind direction function
+# -------------------------
+
+def wind_direction(degrees):
+    directions = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE',
+                  'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW',
+                  'W', 'WNW', 'NW', 'NNW']
+    index = round(degrees / 22.5) % 16
+    return directions[index]
+
+# -------------------------
+# Weather task
+# -------------------------
+
+def update_weather():
+    # Initialize OWM manager
+    owm = OWM('YOUR_API_KEY')  # Replace with your API key if needed
+    mgr = owm.weather_manager()
+
+    while True:
+        try:
+            observation = mgr.weather_at_place('CITY, STATE, COUNTRY')
+            w = observation.weather
+
+            current_time = datetime.now().strftime('%m-%d-%Y %H:%M')
+
+            # Temperature
+            temperature = w.temperature("fahrenheit")
+            temperature_value = temperature['temp']
+            feels_like = temperature['feels_like']
+
+            # Pressure
+            pressure_mb = w.barometric_pressure()['press']
+            pressure_inHg = pressure_mb * 0.029529983071445
+
+            # UV Index
+            uv_index = w.uvi
+
+            # Visibility in miles
+            visibility_miles = (w.visibility() / 1000) * 0.621371
+
+            # Wind
+            wind = w.wind()
+            wind_speed = wind.get('speed', 'N/A')
+            wind_gust = wind.get('gust', 'N/A')
+            wind_direction_degrees = wind.get('deg')
+            wind_direction_cardinal = (
+                wind_direction(wind_direction_degrees)
+                if wind_direction_degrees is not None else 'N/A'
+            )
+
+            # HTML output
+            output = f"""
+            <!DOCTYPE html>
+            <html>
+            <head>
+                <meta http-equiv="refresh" content="300"> <!-- refresh every 5 minutes -->
+                <title>CITY STATE Weather</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 20px; }}
+                    h2 {{ color: #2c3e50; }}
+                    p {{ font-size: 20px; }}
+                    hr {{ margin: 20px 0; }}
+                </style>
+            </head>
+            <body>
+                <h2>Weather Observation for Lebanon, PA</h2>
+                <p><b>Observation Ran At:</b> {current_time}</p>
+                <p><b>Overview:</b> {w.detailed_status}</p>
+                <p><b>Temperature:</b> {temperature_value}°F</p>
+                <p><b>Feels Like:</b> {feels_like}°F</p>
+                <p><b>Wind:</b> {wind_speed} mph {'(Gust: ' + str(wind_gust) + ' mph)' if wind_gust != 'N/A' else ''}, Direction: {wind_direction_cardinal}</p>
+                <p><b>Humidity:</b> {w.humidity}%</p>
+                <p><b>Cloud Coverage:</b> {w.clouds}%</p>
+                <p><b>Precipitation:</b> {w.rain}</p>
+                <p><b>Rain Last 1 Hour:</b> {w.rain.get('1h', 'N/A')}</p>
+                <p><b>Rain Last 3 Hours:</b> {w.rain.get('3h', 'N/A')}</p>
+                <p><b>Air Pressure:</b> {pressure_inHg:.2f} inHg</p>
+                <p><b>Visibility:</b> {visibility_miles:.2f} miles</p>
+                <p><b>UV Index:</b> {uv_index}</p>
+                <hr>
+                <p>Page will auto-refresh every 5 minutes.</p>
+            </body>
+            </html>
+            """
+
+            # Store output
+            latest_weather["output"] = output
+            print(f"Weather updated at {current_time}")
+
+        except Exception as e:
+            latest_weather["output"] = f"<p>Error fetching weather: {e}</p>"
+            print("Error:", e)
+
+        # Wait 5 minutes
+        time.sleep(5 * 60)
+
+# -------------------------
+# Flask route
+# -------------------------
+@app.route("/")
+def index():
+    return render_template_string(latest_weather["output"])
+
+# -------------------------
+# Start weather updater in background thread
+# -------------------------
+threading.Thread(target=update_weather, daemon=True).start()
+
+# -------------------------
+# Run Flask app on local IP
+# -------------------------
+if __name__ == "__main__":
+    app.run(host="0.0.0.0", port=5000)
