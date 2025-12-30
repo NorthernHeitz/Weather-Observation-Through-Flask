@@ -30,7 +30,7 @@ def wind_direction(degrees):
 
 def update_weather():
     # Initialize OWM manager
-    owm = OWM('YOUR_API_KEY')  # Replace with your API key if needed
+    owm = OWM('YOUR_API_KEY')
     mgr = owm.weather_manager()
 
     while True:
